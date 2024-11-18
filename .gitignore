@@ -1,0 +1,7 @@
+# Environment
+__pycache__/
+venv/
+*.log
+
+# Images
+public/
