@@ -1,98 +1,117 @@
+from flask import Flask, jsonify, send_file, request
 from nasa_scraper import scrappe_nasa, resize_image
-from fastapi import FastAPI, HTTPException, Request, Query, Path
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from datetime import datetime, timedelta
-import time, os, random
-import logging
+import random, time, os
 
-logging.basicConfig(
-    filename="app.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-
-logger = logging.getLogger("nasa_api")
-
-BASE_URL = "http://localhost:8000"
+app = Flask(__name__)
+PORT = 3400
 BASE_IMAGE_DIR = "public"
-app = FastAPI()
-app.mount("/static", StaticFiles(directory="public/"), name="static")
+BASE_URL = f"http://localhost:{PORT}"
 
 
 
 
 def process_image(date: str, w: int, h: int):
     try:
-        logger.info(f"Processing image for date: {date}, width: {w}, height: {h}")
         image_path = scrappe_nasa(date)
         if not image_path:
-            raise HTTPException(status_code=404, detail="NASA image not found for this date.")
+            return None
 
-        if (w > 0 and h > 0):
-            output_folder = f"public/{w}x{h}"
+        if w > 0 and h > 0:
+            output_folder = f"{BASE_IMAGE_DIR}/{w}x{h}"
             resized_path = f"{output_folder}/{date}.jpg"
             os.makedirs(output_folder, exist_ok=True)
             resize_image(image_path, resized_path, w, h, crop=True)
-            logger.info(f"Image resized successfully: {resized_path}")
             return resized_path
-
         else:
-            logger.info(f"Returning original image: {image_path}")
             return image_path
-
     except Exception as e:
-        logger.exception(f"Error processing image for date: {date}, width: {w}, height: {h}")
-        raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
+        return None
 
 
-@app.get("/")
+@app.route("/", methods=["GET"])
 def read_root():
-    return { "message": (
-        "Welcome to the NASA Daily Picture API! "
-        "Docs: https://github.com/Leogendra/NASA-Daily-API"
-    )}
+    return jsonify({
+        "message": (
+            "Welcome to the NASA Daily Picture API! "
+            "Docs: https://github.com/Leogendra/NASA-Daily-API"
+        )
+    })
 
 
-@app.get("/daily/", response_class=FileResponse)
-def get_daily_nasa(w: int = Query(0), h: int = Query(0)):
-    today = time.strftime("%y%m%d")
-    image_path = process_image(today, w, h)
-    return FileResponse(image_path, media_type="image/jpeg")
-
-
-@app.get("/date/{date}/", response_class=FileResponse)
-def get_image_by_date(
-    date: str = Path(..., regex=r"^\d{6}$", description="Date au format YYMMDD"),
-    w: int = Query(0),
-    h: int = Query(0),
-):
-    image_path = process_image(date, w, h)
-    return FileResponse(image_path, media_type="image/jpeg")
-
-
-@app.get("/random/", response_class=FileResponse)
-def get_random_image(w: int = Query(0), h: int = Query(0)):
+@app.route("/daily/", methods=["GET"])
+def get_daily_nasa():
     try:
+        w = int(request.args.get("w", 0))
+        h = int(request.args.get("h", 0))
+        today = time.strftime("%y%m%d")
+        image_path = process_image(today, w, h)
+        if image_path:
+            return send_file(image_path, mimetype="image/jpeg")
+        else:
+            return jsonify({"error": "Image not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/date/<date>/", methods=["GET"])
+def get_image_by_date(date):
+    try:
+        w = int(request.args.get("w", 0))
+        h = int(request.args.get("h", 0))
+        if not date.isdigit() or len(date) != 6:
+            return jsonify({"error": "Invalid date format. Use YYMMDD."}), 400
+        image_path = process_image(date, w, h)
+        if image_path:
+            return send_file(image_path, mimetype="image/jpeg")
+        else:
+            return jsonify({"error": "Image not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/random/", methods=["GET"])
+def get_random_image():
+    try:
+        w = int(request.args.get("w", 0))
+        h = int(request.args.get("h", 0))
         start_date = datetime(1996, 1, 1)
         end_date = datetime.now()
         random_days = random.randint(0, (end_date - start_date).days)
         random_date = start_date + timedelta(days=random_days)
-
         random_date_str = random_date.strftime("%y%m%d")
         image_path = process_image(random_date_str, w, h)
-        return FileResponse(image_path, media_type="image/jpeg")
-
+        if image_path:
+            return send_file(image_path, mimetype="image/jpeg")
+        else:
+            return jsonify({"error": "Image not found"}), 404
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return jsonify({"error": str(e)}), 500
 
 
-@app.get("/download/{date}/", response_class=FileResponse)
-def download_image(
-    date: str = Path(..., regex=r"^\d{6}$", description="Date au format YYMMDD"),
-    w: int = Query(0),
-    h: int = Query(0),
-):
-    image_path = process_image(date, w, h)
-    return FileResponse(image_path, media_type="image/jpeg", filename=f"{date}_{w}x{h}.jpg")
+@app.route("/download/<date>/", methods=["GET"])
+def download_image(date):
+    try:
+        w = int(request.args.get("w", 0))
+        h = int(request.args.get("h", 0))
+        if not date.isdigit() or len(date) != 6:
+            return jsonify({"error": "Invalid date format. Use YYMMDD."}), 400
+        image_path = process_image(date, w, h)
+        if image_path:
+            return send_file(
+                image_path,
+                mimetype="image/jpeg",
+                as_attachment=True,
+                download_name=f"{date}_{w}x{h}.jpg"
+            )
+        else:
+            return jsonify({"error": "Image not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port=PORT)
+    print(f"Server is running on http://localhost:{PORT}")
