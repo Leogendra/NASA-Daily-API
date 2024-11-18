@@ -17,14 +17,14 @@ def process_image(date: str, w: int, h: int):
         if not image_path:
             return None
 
-        if w > 0 and h > 0:
+        if ((w > 0) and (h > 0)):
             output_folder = f"{BASE_IMAGE_DIR}/{w}x{h}"
             resized_path = f"{output_folder}/{date}.jpg"
             os.makedirs(output_folder, exist_ok=True)
             resize_image(image_path, resized_path, w, h, crop=True)
-            return resized_path
+            return resized_path, f"{date}_{w}x{h}.jpg"
         else:
-            return image_path
+            return image_path, f"{date}.jpg"
     except Exception as e:
         return None
 
@@ -44,10 +44,16 @@ def get_daily_nasa():
     try:
         w = int(request.args.get("w", 0))
         h = int(request.args.get("h", 0))
+        download = request.args.get("download", "false").lower() == "true"
         today = time.strftime("%y%m%d")
-        image_path = process_image(today, w, h)
+        image_path, image_name = process_image(today, w, h)
         if image_path:
-            return send_file(image_path, mimetype="image/jpeg")
+            return send_file(
+                image_path,
+                mimetype="image/jpeg",
+                as_attachment=download,
+                download_name=image_name
+            )
         else:
             return jsonify({"error": "Image not found"}), 404
     except Exception as e:
@@ -59,11 +65,17 @@ def get_image_by_date(date):
     try:
         w = int(request.args.get("w", 0))
         h = int(request.args.get("h", 0))
+        download = request.args.get("download", "false").lower() == "true"
         if not date.isdigit() or len(date) != 6:
             return jsonify({"error": "Invalid date format. Use YYMMDD."}), 400
-        image_path = process_image(date, w, h)
+        image_path, image_name = process_image(date, w, h)
         if image_path:
-            return send_file(image_path, mimetype="image/jpeg")
+            return send_file(
+                image_path,
+                mimetype="image/jpeg",
+                as_attachment=download,
+                download_name=image_name
+            )
         else:
             return jsonify({"error": "Image not found"}), 404
     except Exception as e:
@@ -75,34 +87,19 @@ def get_random_image():
     try:
         w = int(request.args.get("w", 0))
         h = int(request.args.get("h", 0))
+        download = request.args.get("download", "false").lower() == "true"
         start_date = datetime(1996, 1, 1)
         end_date = datetime.now()
         random_days = random.randint(0, (end_date - start_date).days)
         random_date = start_date + timedelta(days=random_days)
         random_date_str = random_date.strftime("%y%m%d")
-        image_path = process_image(random_date_str, w, h)
-        if image_path:
-            return send_file(image_path, mimetype="image/jpeg")
-        else:
-            return jsonify({"error": "Image not found"}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/download/<date>/", methods=["GET"])
-def download_image(date):
-    try:
-        w = int(request.args.get("w", 0))
-        h = int(request.args.get("h", 0))
-        if not date.isdigit() or len(date) != 6:
-            return jsonify({"error": "Invalid date format. Use YYMMDD."}), 400
-        image_path = process_image(date, w, h)
+        image_path, image_name = process_image(random_date_str, w, h)
         if image_path:
             return send_file(
                 image_path,
                 mimetype="image/jpeg",
-                as_attachment=True,
-                download_name=f"{date}_{w}x{h}.jpg"
+                as_attachment=download,
+                download_name=image_name
             )
         else:
             return jsonify({"error": "Image not found"}), 404
