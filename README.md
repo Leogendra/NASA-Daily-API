@@ -2,7 +2,7 @@
 
 A Python web API to fetch and resize the Astronomy Picture of the Day from [NASA APOD (Astronomy Picture of the Day)](https://apod.nasa.gov/apod/), with customizable cropping options.
 
-<!-- The API is available at: [https://nasa-gatienh.fr/](https://nasa-gatienh.fr/). -->
+The API is available at: [https://nasa.gatienh.fr/](https://nasa.gatienh.fr/).
 
 ## **Endpoints**
 
