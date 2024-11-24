@@ -29,7 +29,7 @@ def scrappe_nasa(codeDate):
                 with open(img_path, "wb") as f:
                     f.write(image_response.content)
                 return img_path
-    return None
+    return "public/default.jpg"
 
 
 def resize_image(imagePath, outputPath, wRatio, hRatio, crop=True):
