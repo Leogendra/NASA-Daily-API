@@ -1,7 +1,6 @@
 from flask import Flask, jsonify, send_file, request
 from nasa_scraper import scrappe_nasa, resize_image
-from datetime import datetime, timedelta
-import random, time, os
+import datetime, random, os
 
 app = Flask(__name__)
 PORT = 3400
@@ -45,8 +44,8 @@ def get_daily_nasa():
         w = int(request.args.get("w", 0))
         h = int(request.args.get("h", 0))
         download = request.args.get("download", "false").lower() == "true"
-        today = time.strftime("%y%m%d")
-        image_path, image_name = process_image(today, w, h)
+        todayUTC = datetime.datetime.now(datetime.UTC).strftime("%y%m%d")
+        image_path, image_name = process_image(todayUTC, w, h)
         if image_path:
             return send_file(
                 image_path,
@@ -88,10 +87,10 @@ def get_random_image():
         w = int(request.args.get("w", 0))
         h = int(request.args.get("h", 0))
         download = request.args.get("download", "false").lower() == "true"
-        start_date = datetime(1996, 1, 1)
-        end_date = datetime.now()
+        start_date = datetime.datetime(1996, 1, 1)
+        end_date = datetime.datetime.now()
         random_days = random.randint(0, (end_date - start_date).days)
-        random_date = start_date + timedelta(days=random_days)
+        random_date = start_date + datetime.timedelta(days=random_days)
         random_date_str = random_date.strftime("%y%m%d")
         image_path, image_name = process_image(random_date_str, w, h)
         if image_path:
