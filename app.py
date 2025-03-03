@@ -10,11 +10,11 @@ BASE_URL = f"http://localhost:{PORT}"
 
 
 
-def process_image(date: str, w: int, h: int):
+def process_image(date: str, w: int, h: int, minW: int = 0, minH: int = 0):
     try:
-        image_path = scrappe_nasa(date)
+        image_path = scrappe_nasa(date, minW, minH)
         if not(image_path):
-            return None
+            return "public/default.jpg", "default.jpg"
 
         if ((w > 0) and (h > 0)):
             output_folder = f"{BASE_IMAGE_DIR}/{w}x{h}"
@@ -24,7 +24,7 @@ def process_image(date: str, w: int, h: int):
             return resized_path, f"{date}_{w}x{h}.jpg"
         else:
             return image_path, f"{date}.jpg"
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -44,11 +44,14 @@ def get_daily_nasa():
         w = int(request.args.get("w", 0))
         h = int(request.args.get("h", 0))
         download = request.args.get("download", "false").lower() in ["true", "1", "yes"]
+
         todayUTC = (datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-5)))).strftime("%y%m%d")
+
         image_path, image_name = process_image(todayUTC, w, h)
         if (image_name == "default.jpg"):
             return get_random_image()
-        if image_path:
+        
+        if (image_path):
             return send_file(
                 image_path,
                 mimetype="image/jpeg",
@@ -57,6 +60,7 @@ def get_daily_nasa():
             )
         else:
             return jsonify({"error": "Image not found"}), 404
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -79,6 +83,7 @@ def get_image_by_date(date):
             )
         else:
             return jsonify({"error": "Image not found"}), 404
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -88,22 +93,37 @@ def get_random_image():
     try:
         w = int(request.args.get("w", 0))
         h = int(request.args.get("h", 0))
+        minW = int(request.args.get("minW", 0))
+        minH = int(request.args.get("minH", 0))
         download = request.args.get("download", "false").lower() in ["true", "1", "yes"]
+
         start_date = datetime.datetime(1996, 1, 1)
         end_date = datetime.datetime.now()
-        random_days = random.randint(0, (end_date - start_date).days)
-        random_date = start_date + datetime.timedelta(days=random_days)
-        random_date_str = random_date.strftime("%y%m%d")
-        image_path, image_name = process_image(random_date_str, w, h)
-        if image_path:
+
+        nbRetries = 5
+        while (nbRetries):
+            print(f"Searching for image... {nbRetries} retries left")
+            random_days = random.randint(0, (end_date - start_date).days)
+            random_date = start_date + datetime.timedelta(days=random_days)
+            random_date_str = random_date.strftime("%y%m%d")
+            image_path, image_name = process_image(random_date_str, w, h, minW, minH)
+            if (image_name != "default.jpg"):
+                break
+            else:
+                print(f"[DEBUG] Image not found for {random_date_str}")
+                nbRetries -= 1
+
+        if (image_path):
             return send_file(
                 image_path,
                 mimetype="image/jpeg",
                 as_attachment=download,
                 download_name=image_name
             )
+        
         else:
-            return jsonify({"error": "Image not found"}), 404
+            return jsonify({"error": "No image found with the specified parameters"}), 404
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
