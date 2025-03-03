@@ -46,6 +46,8 @@ def get_daily_nasa():
         download = request.args.get("download", "false").lower() in ["true", "1", "yes"]
         todayUTC = (datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-5)))).strftime("%y%m%d")
         image_path, image_name = process_image(todayUTC, w, h)
+        if (image_name == "default.jpg"):
+            return get_random_image()
         if image_path:
             return send_file(
                 image_path,
