@@ -1,6 +1,6 @@
-from flask import Flask, jsonify, send_file, request
 from nasa_scraper import create_folder, scrappe_nasa, resize_image
-import datetime, random, os
+from flask import Flask, jsonify, send_file, request
+import datetime, random
 
 app = Flask(__name__)
 PORT = 3400
@@ -14,10 +14,8 @@ def process_image(date: str, w: int, h: int, crop: bool, minW: int = 0, minH: in
     try:
         image_path = scrappe_nasa(date, minW, minH)
         if not(image_path):
-            image_path, date = "public/default.jpg", "default"
+            image_path, date = "default.jpg", "default"
         
-        print(f"Processing image {date}")
-        print(f"Image path: {image_path}")
         image_name = f"{date}.jpg"
         if ((w > 0) and (h > 0)):
             output_folder = f"{BASE_IMAGE_DIR}/{w}x{h}"
@@ -30,7 +28,7 @@ def process_image(date: str, w: int, h: int, crop: bool, minW: int = 0, minH: in
             return image_path, image_name
     except Exception as e:
         print(f"Error: {str(e)}")
-        return "public/default.jpg", "default.jpg"
+        return "default.jpg", "default.jpg"
 
 
 @app.route("/", methods=["GET"])
