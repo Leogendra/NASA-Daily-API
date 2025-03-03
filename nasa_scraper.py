@@ -5,9 +5,9 @@ import requests
 import os
 
 
-def create_folder(folderName: str):
-    if not os.path.exists(folderName):
-        os.makedirs(folderName)
+def create_folder(folder_name: str):
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
 
 
 def scrappe_nasa(codeDate: str, minW: int = 0, minH: int = 0):
@@ -39,7 +39,8 @@ def scrappe_nasa(codeDate: str, minW: int = 0, minH: int = 0):
                         return None
 
                 print(f"Saving image {codeDate}")
-                image.save(img_path)
+                with open(img_path, "wb") as file:
+                    file.write(image_response.content)
                 return img_path
     return None
 
@@ -48,21 +49,32 @@ def resize_image(imagePath: str, outputPath: str, wRatio: int, hRatio: int, crop
     with Image.open(imagePath) as img:
         width, height = img.size
         target_ratio = wRatio / hRatio
+        img_ratio = width / height
 
         if crop:
-            img_ratio = width / height
-            if img_ratio > target_ratio:
+            if (img_ratio > target_ratio):
                 new_height = height
                 new_width = int(height * target_ratio)
                 left = (width - new_width) // 2
-                img_cropped = img.crop((left, 0, left + new_width, height))
+                img_resized = img.crop((left, 0, left + new_width, height))
             else:
                 new_width = width
                 new_height = int(width / target_ratio)
                 top = (height - new_height) // 2
-                img_cropped = img.crop((0, top, width, top + new_height))
+                img_resized = img.crop((0, top, width, top + new_height))
 
-            img_cropped.save(outputPath)
-            return outputPath
+            print(f"[debug] Resizing image to {new_width}x{new_height}")
+
         else:
-            return None
+            if (img_ratio > target_ratio):
+                new_width = width
+                new_height = int(width / target_ratio)
+            else:
+                new_height = height
+                new_width = int(height * target_ratio)
+
+            img_resized = img.resize((new_width, new_height), Image.LANCZOS)
+            print(f"[debug] Resizing image proportionally to {new_width}x{new_height}")
+        
+        img_resized.save(outputPath)
+        return outputPath

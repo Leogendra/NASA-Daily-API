@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, send_file, request
-from nasa_scraper import scrappe_nasa, resize_image
+from nasa_scraper import create_folder, scrappe_nasa, resize_image
 import datetime, random, os
 
 app = Flask(__name__)
@@ -10,22 +10,27 @@ BASE_URL = f"http://localhost:{PORT}"
 
 
 
-def process_image(date: str, w: int, h: int, minW: int = 0, minH: int = 0):
+def process_image(date: str, w: int, h: int, crop: bool, minW: int = 0, minH: int = 0):
     try:
         image_path = scrappe_nasa(date, minW, minH)
         if not(image_path):
-            return "public/default.jpg", "default.jpg"
-
+            image_path, date = "public/default.jpg", "default"
+        
+        print(f"Processing image {date}")
+        print(f"Image path: {image_path}")
+        image_name = f"{date}.jpg"
         if ((w > 0) and (h > 0)):
             output_folder = f"{BASE_IMAGE_DIR}/{w}x{h}"
             resized_path = f"{output_folder}/{date}.jpg"
-            os.makedirs(output_folder, exist_ok=True)
-            resize_image(image_path, resized_path, w, h, crop=True)
-            return resized_path, f"{date}_{w}x{h}.jpg"
+            resized_name = image_name.replace(".jpg", f"_{w}x{h}.jpg")
+            create_folder(output_folder)
+            resize_image(image_path, resized_path, w, h, crop=crop)
+            return resized_path, resized_name
         else:
-            return image_path, f"{date}.jpg"
-    except Exception:
-        return None
+            return image_path, image_name
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None, None
 
 
 @app.route("/", methods=["GET"])
@@ -43,11 +48,12 @@ def get_daily_nasa():
     try:
         w = int(request.args.get("w", 0))
         h = int(request.args.get("h", 0))
+        crop = request.args.get("crop", "true").lower() == "true"
         download = request.args.get("download", "false").lower() in ["true", "1", "yes"]
 
         todayUTC = (datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-5)))).strftime("%y%m%d")
 
-        image_path, image_name = process_image(todayUTC, w, h)
+        image_path, image_name = process_image(todayUTC, w, h, crop)
         if (image_name == "default.jpg"):
             return get_random_image()
         
@@ -70,10 +76,11 @@ def get_image_by_date(date: str):
     try:
         w = int(request.args.get("w", 0))
         h = int(request.args.get("h", 0))
+        crop = request.args.get("crop", "true").lower() == "true"
         download = request.args.get("download", "false").lower() in ["true", "1", "yes"]
         if not date.isdigit() or len(date) != 6:
             return jsonify({"error": "Invalid date format. Use YYMMDD."}), 400
-        image_path, image_name = process_image(date, w, h)
+        image_path, image_name = process_image(date, w, h, crop)
         if image_path:
             return send_file(
                 image_path,
@@ -93,6 +100,7 @@ def get_random_image():
     try:
         w = int(request.args.get("w", 0))
         h = int(request.args.get("h", 0))
+        crop = request.args.get("crop", "true").lower() == "true"
         minW = int(request.args.get("minW", 0))
         minH = int(request.args.get("minH", 0))
         download = request.args.get("download", "false").lower() in ["true", "1", "yes"]
@@ -106,7 +114,7 @@ def get_random_image():
             random_days = random.randint(0, (end_date - start_date).days)
             random_date = start_date + datetime.timedelta(days=random_days)
             random_date_str = random_date.strftime("%y%m%d")
-            image_path, image_name = process_image(random_date_str, w, h, minW, minH)
+            image_path, image_name = process_image(random_date_str, w, h, crop, minW, minH)
             if (image_name != "default.jpg"):
                 break
             else:
