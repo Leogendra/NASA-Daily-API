@@ -13,7 +13,7 @@ BASE_URL = f"http://localhost:{PORT}"
 def process_image(date: str, w: int, h: int):
     try:
         image_path = scrappe_nasa(date)
-        if not image_path:
+        if not(image_path):
             return None
 
         if ((w > 0) and (h > 0)):
@@ -43,7 +43,7 @@ def get_daily_nasa():
     try:
         w = int(request.args.get("w", 0))
         h = int(request.args.get("h", 0))
-        download = request.args.get("download", "false").lower() == "true"
+        download = request.args.get("download", "false").lower() in ["true", "1", "yes"]
         todayUTC = (datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-5)))).strftime("%y%m%d")
         image_path, image_name = process_image(todayUTC, w, h)
         if image_path:
@@ -64,7 +64,7 @@ def get_image_by_date(date):
     try:
         w = int(request.args.get("w", 0))
         h = int(request.args.get("h", 0))
-        download = request.args.get("download", "false").lower() == "true"
+        download = request.args.get("download", "false").lower() in ["true", "1", "yes"]
         if not date.isdigit() or len(date) != 6:
             return jsonify({"error": "Invalid date format. Use YYMMDD."}), 400
         image_path, image_name = process_image(date, w, h)
@@ -86,7 +86,7 @@ def get_random_image():
     try:
         w = int(request.args.get("w", 0))
         h = int(request.args.get("h", 0))
-        download = request.args.get("download", "false").lower() == "true"
+        download = request.args.get("download", "false").lower() in ["true", "1", "yes"]
         start_date = datetime.datetime(1996, 1, 1)
         end_date = datetime.datetime.now()
         random_days = random.randint(0, (end_date - start_date).days)
