@@ -5,12 +5,12 @@ import requests
 import os
 
 
-def create_folder(folder_name):
-    if not os.path.exists(folder_name):
-        os.makedirs(folder_name)
+def create_folder(folderName: str):
+    if not os.path.exists(folderName):
+        os.makedirs(folderName)
 
 
-def scrappe_nasa(codeDate, minW=0, minH=0):
+def scrappe_nasa(codeDate: str, minW: int = 0, minH: int = 0):
     url = f"https://apod.nasa.gov/apod/ap{codeDate}.html"
     img_path = f"public/nasa_pictures/{codeDate}.jpg"
     create_folder("public/")
@@ -44,7 +44,7 @@ def scrappe_nasa(codeDate, minW=0, minH=0):
     return None
 
 
-def resize_image(imagePath, outputPath, wRatio, hRatio, crop=True):
+def resize_image(imagePath: str, outputPath: str, wRatio: int, hRatio: int, crop: bool = True):
     with Image.open(imagePath) as img:
         width, height = img.size
         target_ratio = wRatio / hRatio

@@ -66,7 +66,7 @@ def get_daily_nasa():
 
 
 @app.route("/date/<date>/", methods=["GET"])
-def get_image_by_date(date):
+def get_image_by_date(date: str):
     try:
         w = int(request.args.get("w", 0))
         h = int(request.args.get("h", 0))
