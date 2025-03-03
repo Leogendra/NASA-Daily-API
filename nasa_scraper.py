@@ -5,6 +5,8 @@ import requests
 import os
 
 
+
+
 def create_folder(folder_name: str):
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
@@ -35,10 +37,8 @@ def scrappe_nasa(codeDate: str, minW: int = 0, minH: int = 0):
 
                     # Verify if the image has the minimum width and height
                     if ((width < minW) or (height < minH)):
-                        print(f"Image {codeDate} has less than {minW}x{minH} pixels")
                         return None
 
-                print(f"Saving image {codeDate}")
                 with open(img_path, "wb") as file:
                     file.write(image_response.content)
                 return img_path
@@ -63,8 +63,6 @@ def resize_image(imagePath: str, outputPath: str, wRatio: int, hRatio: int, crop
                 top = (height - new_height) // 2
                 img_resized = img.crop((0, top, width, top + new_height))
 
-            print(f"[debug] Resizing image to {new_width}x{new_height}")
-
         else:
             if (img_ratio > target_ratio):
                 new_width = width
@@ -74,7 +72,6 @@ def resize_image(imagePath: str, outputPath: str, wRatio: int, hRatio: int, crop
                 new_width = int(height * target_ratio)
 
             img_resized = img.resize((new_width, new_height), Image.LANCZOS)
-            print(f"[debug] Resizing image proportionally to {new_width}x{new_height}")
         
         img_resized.save(outputPath)
         return outputPath

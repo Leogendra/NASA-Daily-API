@@ -30,7 +30,7 @@ def process_image(date: str, w: int, h: int, crop: bool, minW: int = 0, minH: in
             return image_path, image_name
     except Exception as e:
         print(f"Error: {str(e)}")
-        return None, None
+        return "public/default.jpg", "default.jpg"
 
 
 @app.route("/", methods=["GET"])
@@ -81,7 +81,8 @@ def get_image_by_date(date: str):
         if not date.isdigit() or len(date) != 6:
             return jsonify({"error": "Invalid date format. Use YYMMDD."}), 400
         image_path, image_name = process_image(date, w, h, crop)
-        if image_path:
+        
+        if (image_path):
             return send_file(
                 image_path,
                 mimetype="image/jpeg",
@@ -115,10 +116,9 @@ def get_random_image():
             random_date = start_date + datetime.timedelta(days=random_days)
             random_date_str = random_date.strftime("%y%m%d")
             image_path, image_name = process_image(random_date_str, w, h, crop, minW, minH)
-            if (image_name != "default.jpg"):
+            if ("default" not in image_name):
                 break
             else:
-                print(f"[DEBUG] Image not found for {random_date_str}")
                 nbRetries -= 1
 
         if (image_path):
