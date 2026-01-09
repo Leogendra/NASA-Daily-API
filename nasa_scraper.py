@@ -3,6 +3,7 @@ from io import BytesIO
 from PIL import Image
 import requests
 import os
+import re
 
 
 
@@ -12,7 +13,7 @@ def create_folder(folder_name: str):
         os.makedirs(folder_name)
 
 
-def scrappe_nasa(codeDate: str, minW: int = 0, minH: int = 0):
+def scrappe_nasa(codeDate: str, minW: int = 0, minH: int = 0) -> str:
     url = f"https://apod.nasa.gov/apod/ap{codeDate}.html"
     img_path = f"public/nasa_pictures/{codeDate}.jpg"
     create_folder("public/")
@@ -45,7 +46,61 @@ def scrappe_nasa(codeDate: str, minW: int = 0, minH: int = 0):
     return None
 
 
-def resize_image(imagePath: str, outputPath: str, wRatio: int, hRatio: int, crop: bool = True):
+def get_apod_metadata(codeDate: str) -> dict:
+    url = f"https://apod.nasa.gov/apod/ap{codeDate}.html"
+    
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, "html.parser")
+            
+            title = None
+            centers = soup.find_all("center")
+            for center in centers:
+                b_tag = center.find("b")
+                if (b_tag and ("Image Credit" not in b_tag.get_text())):
+                    title_text = b_tag.get_text().strip()
+                    if (title_text and title_text != "Explanation:"):
+                        title = title_text
+                        break
+            
+            credit = None
+            for center in centers:
+                text = center.get_text()
+                if ("Image Credit" in text):
+                    lines = [line.strip() for line in text.split('\n') if line.strip()]
+                    for i, line in enumerate(lines):
+                        if ("Copyright:" in line and i + 1 < len(lines)):
+                            credit = lines[i + 1]
+                            break
+                    break
+            
+            explanation = None
+            paragraphs = soup.find_all("p")
+            for p in paragraphs:
+                explanation_text = p.get_text()
+                if (p.find("b") and "Explanation:" in explanation_text):
+                    explanation = explanation_text.split("Explanation:", 1)[1]
+                    explanation = explanation.split("Tomorrow's picture:")[0]
+                    explanation = re.sub(r'\s+', ' ', explanation).strip()
+                    break
+
+            formatted_date = f"20{codeDate[:2]}-{codeDate[2:4]}-{codeDate[4:6]}"
+            
+            return {
+                "date": formatted_date,
+                "title": title,
+                "credit": credit,
+                "explanation": explanation,
+            }
+        else:
+            return None
+    except Exception as e:
+        print(f"Error scraping metadata: {str(e)}")
+        return None
+
+
+def resize_image(imagePath: str, outputPath: str, wRatio: int, hRatio: int, crop: bool = True) -> str:
     with Image.open(imagePath) as img:
         width, height = img.size
         target_ratio = wRatio / hRatio

@@ -1,4 +1,4 @@
-from nasa_scraper import create_folder, scrappe_nasa, resize_image
+from nasa_scraper import create_folder, scrappe_nasa, resize_image, get_apod_metadata
 from flask import Flask, jsonify, send_file, request
 import datetime, random
 
@@ -8,6 +8,8 @@ BASE_IMAGE_DIR = "public"
 BASE_URL = f"http://localhost:{PORT}"
 
 
+def get_current_utc_date() -> str:
+    return (datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-5)))).strftime("%y%m%d")
 
 
 def process_image(date: str, w: int, h: int, crop: bool, minW: int = 0, minH: int = 0):
@@ -49,7 +51,7 @@ def get_daily_nasa():
         crop = request.args.get("crop", "true").lower() == "true"
         download = request.args.get("download", "false").lower() in ["true", "1", "yes"]
 
-        todayUTC = (datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-5)))).strftime("%y%m%d")
+        todayUTC = get_current_utc_date()
 
         image_path, image_name = process_image(todayUTC, w, h, crop)
         if (image_name == "default.jpg"):
@@ -129,6 +131,38 @@ def get_random_image():
         
         else:
             return jsonify({"error": "No image found with the specified parameters"}), 404
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/metadata/daily/", methods=["GET"])
+def get_daily_metadata():
+    try:
+        todayUTC = get_current_utc_date()
+        metadata = get_apod_metadata(todayUTC)
+        
+        if metadata:
+            return jsonify(metadata)
+        else:
+            return jsonify({"error": "Metadata not found"}), 404
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/metadata/date/<date>/", methods=["GET"])
+def get_metadata_by_date(date: str):
+    try:
+        if (not(date.isdigit()) or len(date) != 6):
+            return jsonify({"error": "Invalid date format. Use YYMMDD."}), 400
+        
+        metadata = get_apod_metadata(date)
+        
+        if metadata:
+            return jsonify(metadata)
+        else:
+            return jsonify({"error": "Metadata not found"}), 404
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
