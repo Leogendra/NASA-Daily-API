@@ -36,6 +36,23 @@ The API is available at: [https://nasa.gatienh.fr/](https://nasa.gatienh.fr/).
   GET http://127.0.0.1:3400/random/?minW=500&minH=2000
   ```
 
+### **5. [GET] `/metadata/daily/`**
+- Fetches the metadata (title, credit, explanation) for today's NASA APOD.
+- **Example**:
+  ```
+  GET http://127.0.0.1:3400/metadata/daily/
+  ```
+
+### **6. [GET] `/metadata/date/{date}/`**
+- Fetches the metadata (title, credit, explanation) for a specific date.
+- **Path Parameters**:
+  - `date` (str, required): The date in `YYMMDD` format.
+- **Example**:
+  ```
+  GET http://127.0.0.1:3400/metadata/date/260109/
+  ```
+
+
 ### **Common Parameters**
 These query parameters are available in all endpoints:
 
