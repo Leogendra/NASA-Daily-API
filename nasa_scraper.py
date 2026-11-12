@@ -194,6 +194,8 @@ def resize_image(imagePath: str, outputPath: str, wRatio: int, hRatio: int, crop
                 new_width = int(height * target_ratio)
 
             img_resized = img.resize((new_width, new_height), Image.LANCZOS)
-        
+
+        if (img_resized.mode not in ("RGB", "L")):
+            img_resized = img_resized.convert("RGB")
         img_resized.save(outputPath)
         return outputPath
