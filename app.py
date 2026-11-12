@@ -1,11 +1,43 @@
 from nasa_scraper import create_folder, scrappe_nasa, resize_image, get_apod_metadata
 from flask import Flask, jsonify, send_file, request
-import datetime, random
+import datetime, random, logging, requests
 
 app = Flask(__name__)
 PORT = 3400
 BASE_IMAGE_DIR = "public"
 BASE_URL = f"http://localhost:{PORT}"
+
+
+
+
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
+logger = logging.getLogger('app_logger')
+logger.setLevel(logging.INFO)
+handler = logging.FileHandler('requests.log')
+formatter = logging.Formatter('[%(asctime)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+
+@app.before_request
+def log_request():
+    userLocation = "Unknown"
+    userIp = request.remote_addr
+    try:
+        resp = requests.get(f"https://ipinfo.io/{userIp}/json", timeout=2)
+        if resp.status_code == 200:
+            data = resp.json()
+            city = data.get("city", "")
+            region = data.get("region", "")
+            country = data.get("country", "")
+            userLocation = f"{city}, {region}, {country}".strip(", ")
+            if not(userLocation):
+                userLocation = "Unknown"
+    except Exception:
+        pass
+    
+    log_message = f"{request.path} - {userIp} - {userLocation}"
+    logger.info(log_message)
 
 
 def get_current_utc_date() -> str:
