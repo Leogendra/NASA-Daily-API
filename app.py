@@ -1,12 +1,15 @@
 from nasa_scraper import create_folder, scrappe_nasa, resize_image, get_apod_metadata, get_random_apod_date
 from flask import Flask, jsonify, send_file, request
-import datetime, logging, requests
+import datetime, logging, requests, os, sys
 
 app = Flask(__name__)
 PORT = 3400
 BASE_IMAGE_DIR = "public"
 DEFAULT_IMAGE = "default.jpg"
 BASE_URL = f"http://localhost:{PORT}"
+
+if not(os.path.isfile(DEFAULT_IMAGE)):
+    sys.exit(f"Error: default image '{DEFAULT_IMAGE}' not found in {os.getcwd()}")
 
 
 
