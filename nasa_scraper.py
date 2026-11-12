@@ -82,14 +82,7 @@ def get_image_url(soup: BeautifulSoup) -> str:
     return None
 
 
-def scrappe_nasa(codeDate: str, minW: int = 0, minH: int = 0) -> str:
-    img_path = f"public/nasa_pictures/{codeDate}.jpg"
-    create_folder("public/")
-    create_folder("public/nasa_pictures/")
-
-    if os.path.exists(img_path):
-        return img_path
-
+def download_apod_image(codeDate: str, img_path: str) -> bool:
     soup = fetch_apod_article(codeDate)
     if soup:
         image_url = get_image_url(soup)
@@ -100,22 +93,30 @@ def scrappe_nasa(codeDate: str, minW: int = 0, minH: int = 0) -> str:
             if image_response.status_code == 200:
                 # Never cache something that is not an image (e.g. an HTML page after a site change)
                 try:
-                    image = Image.open(BytesIO(image_response.content))
-                    image.verify()
+                    Image.open(BytesIO(image_response.content)).verify()
                 except Exception:
-                    return None
-
-                if (minW and minH):
-                    width, height = image.size
-
-                    # Verify if the image has the minimum width and height
-                    if ((width < minW) or (height < minH)):
-                        return None
+                    return False
 
                 with open(img_path, "wb") as file:
                     file.write(image_response.content)
-                return img_path
-    return None
+                return True
+    return False
+
+
+def scrappe_nasa(codeDate: str, minW: int = 0, minH: int = 0) -> str:
+    img_path = f"public/nasa_pictures/{codeDate}.jpg"
+    create_folder("public/")
+    create_folder("public/nasa_pictures/")
+
+    if not(os.path.exists(img_path)) and not(download_apod_image(codeDate, img_path)):
+        return None
+
+    # The minimum size applies to downloaded and cached pictures alike
+    with Image.open(img_path) as image:
+        width, height = image.size
+    if ((minW and minH) and ((width < minW) or (height < minH))):
+        return None
+    return img_path
 
 
 def clean_text(text: str) -> str:
