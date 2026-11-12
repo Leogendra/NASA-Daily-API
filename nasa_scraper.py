@@ -8,6 +8,8 @@ import re
 
 APOD_API_URL = "https://science.nasa.gov/wp-json/wp/v2/image-article"
 APOD_CATEGORY_ID = 22766
+# Endpoint called by https://science.nasa.gov/apod/random-apod/ to draw a random APOD
+APOD_RANDOM_URL = "https://science.nasa.gov/wp-json/smd/v1/embed-post"
 ASSETS_URL = "https://assets.science.nasa.gov/"
 REQUEST_TIMEOUT = 15
 
@@ -35,6 +37,28 @@ def fetch_apod_article(codeDate: str) -> BeautifulSoup:
     if not(posts):
         return None
     return BeautifulSoup(posts[0]["content"]["rendered"], "html.parser")
+
+
+def get_random_apod_date() -> str:
+    body = {
+        "attributes": {
+            "selectedPostTypes": ["image-article"],
+            "selectedCategory": str(APOD_CATEGORY_ID),
+            "randomizePost": True,
+        },
+    }
+    response = requests.post(APOD_RANDOM_URL, json=body, timeout=REQUEST_TIMEOUT)
+    if (response.status_code != 200):
+        return None
+
+    # The embedded article links to its page, not to the full resolution asset: keep only its date
+    soup = BeautifulSoup(response.json().get("html", ""), "html.parser")
+    for row in soup.select(".media-detail-hero__meta-row"):
+        header = row.find("th")
+        if (header and header.get_text().strip() == "Date"):
+            date = datetime.datetime.strptime(row.find("td").get_text().strip(), "%B %d, %Y")
+            return date.strftime("%y%m%d")
+    return None
 
 
 def get_image_url(soup: BeautifulSoup) -> str:

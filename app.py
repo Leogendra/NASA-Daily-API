@@ -1,6 +1,6 @@
-from nasa_scraper import create_folder, scrappe_nasa, resize_image, get_apod_metadata
+from nasa_scraper import create_folder, scrappe_nasa, resize_image, get_apod_metadata, get_random_apod_date
 from flask import Flask, jsonify, send_file, request
-import datetime, random, logging, requests
+import datetime, logging, requests
 
 app = Flask(__name__)
 PORT = 3400
@@ -138,15 +138,14 @@ def get_random_image():
         minH = int(request.args.get("minH", 0))
         download = request.args.get("download", "false").lower() in ["true", "1", "yes"]
 
-        start_date = datetime.datetime(1996, 1, 1)
-        end_date = datetime.datetime.now()
-
+        image_path = None
         nbRetries = 5
         while (nbRetries):
             print(f"Searching for image... {nbRetries} retries left")
-            random_days = random.randint(0, (end_date - start_date).days)
-            random_date = start_date + datetime.timedelta(days=random_days)
-            random_date_str = random_date.strftime("%y%m%d")
+            random_date_str = get_random_apod_date()
+            if not(random_date_str):
+                nbRetries -= 1
+                continue
             image_path, image_name = process_image(random_date_str, w, h, crop, minW, minH)
             if ("default" not in image_name):
                 break
