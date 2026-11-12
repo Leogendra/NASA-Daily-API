@@ -5,6 +5,7 @@ import datetime, logging, requests
 app = Flask(__name__)
 PORT = 3400
 BASE_IMAGE_DIR = "public"
+DEFAULT_IMAGE = "default.jpg"
 BASE_URL = f"http://localhost:{PORT}"
 
 
@@ -44,25 +45,37 @@ def get_current_utc_date() -> str:
     return (datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-5)))).strftime("%y%m%d")
 
 
+def resize_if_needed(image_path: str, name: str, w: int, h: int, crop: bool):
+    if ((w > 0) and (h > 0)):
+        output_folder = f"{BASE_IMAGE_DIR}/{w}x{h}"
+        resized_path = f"{output_folder}/{name}.jpg"
+        create_folder(output_folder)
+        resize_image(image_path, resized_path, w, h, crop=crop)
+        return resized_path, f"{name}_{w}x{h}.jpg"
+    return image_path, f"{name}.jpg"
+
+
+def get_default_image(w: int, h: int, crop: bool):
+    try:
+        return resize_if_needed(DEFAULT_IMAGE, "default", w, h, crop)
+    except Exception as e:
+        print(f"Error resizing default image: {str(e)}")
+        return DEFAULT_IMAGE, DEFAULT_IMAGE
+
+
 def process_image(date: str, w: int, h: int, crop: bool, minW: int = 0, minH: int = 0):
     try:
         image_path = scrappe_nasa(date, minW, minH)
-        if not(image_path):
-            image_path, date = "default.jpg", "default"
-        
-        image_name = f"{date}.jpg"
-        if ((w > 0) and (h > 0)):
-            output_folder = f"{BASE_IMAGE_DIR}/{w}x{h}"
-            resized_path = f"{output_folder}/{date}.jpg"
-            resized_name = image_name.replace(".jpg", f"_{w}x{h}.jpg")
-            create_folder(output_folder)
-            resize_image(image_path, resized_path, w, h, crop=crop)
-            return resized_path, resized_name
-        else:
-            return image_path, image_name
+        if image_path:
+            return resize_if_needed(image_path, date, w, h, crop)
     except Exception as e:
         print(f"Error: {str(e)}")
-        return "default.jpg", "default.jpg"
+    return get_default_image(w, h, crop)
+
+
+def send_default_image():
+    # Last resort when a route fails: serve the default picture as is
+    return send_file(DEFAULT_IMAGE, mimetype="image/jpeg")
 
 
 @app.route("/", methods=["GET"])
@@ -86,21 +99,19 @@ def get_daily_nasa():
         todayUTC = get_current_utc_date()
 
         image_path, image_name = process_image(todayUTC, w, h, crop)
-        if (image_name == "default.jpg"):
+        if ("default" in image_name):
             return get_random_image()
-        
-        if (image_path):
-            return send_file(
-                image_path,
-                mimetype="image/jpeg",
-                as_attachment=download,
-                download_name=image_name
-            )
-        else:
-            return jsonify({"error": "Image not found"}), 404
-        
+
+        return send_file(
+            image_path,
+            mimetype="image/jpeg",
+            as_attachment=download,
+            download_name=image_name
+        )
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error: {str(e)}")
+        return send_default_image()
 
 
 @app.route("/date/<date>/", methods=["GET"])
@@ -113,19 +124,17 @@ def get_image_by_date(date: str):
         if not date.isdigit() or len(date) != 6:
             return jsonify({"error": "Invalid date format. Use YYMMDD."}), 400
         image_path, image_name = process_image(date, w, h, crop)
-        
-        if (image_path):
-            return send_file(
-                image_path,
-                mimetype="image/jpeg",
-                as_attachment=download,
-                download_name=image_name
-            )
-        else:
-            return jsonify({"error": "Image not found"}), 404
-        
+
+        return send_file(
+            image_path,
+            mimetype="image/jpeg",
+            as_attachment=download,
+            download_name=image_name
+        )
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error: {str(e)}")
+        return send_default_image()
 
 
 @app.route("/random/", methods=["GET"])
@@ -144,27 +153,27 @@ def get_random_image():
             print(f"Searching for image... {nbRetries} retries left")
             random_date_str = get_random_apod_date()
             if not(random_date_str):
-                nbRetries -= 1
-                continue
+                # The draw itself failed: the site is down or has changed, retrying will not help
+                break
             image_path, image_name = process_image(random_date_str, w, h, crop, minW, minH)
             if ("default" not in image_name):
                 break
             else:
                 nbRetries -= 1
 
-        if (image_path):
-            return send_file(
-                image_path,
-                mimetype="image/jpeg",
-                as_attachment=download,
-                download_name=image_name
-            )
-        
-        else:
-            return jsonify({"error": "No image found with the specified parameters"}), 404
-        
+        if not(image_path):
+            image_path, image_name = get_default_image(w, h, crop)
+
+        return send_file(
+            image_path,
+            mimetype="image/jpeg",
+            as_attachment=download,
+            download_name=image_name
+        )
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error: {str(e)}")
+        return send_default_image()
 
 
 @app.route("/metadata/daily/", methods=["GET"])
