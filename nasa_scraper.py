@@ -47,18 +47,22 @@ def get_random_apod_date() -> str:
             "randomizePost": True,
         },
     }
-    response = requests.post(APOD_RANDOM_URL, json=body, timeout=REQUEST_TIMEOUT)
-    if (response.status_code != 200):
-        return None
+    try:
+        response = requests.post(APOD_RANDOM_URL, json=body, timeout=REQUEST_TIMEOUT)
+        if (response.status_code != 200):
+            return None
 
-    # The embedded article links to its page, not to the full resolution asset: keep only its date
-    soup = BeautifulSoup(response.json().get("html", ""), "html.parser")
-    for row in soup.select(".media-detail-hero__meta-row"):
-        header = row.find("th")
-        if (header and header.get_text().strip() == "Date"):
-            date = datetime.datetime.strptime(row.find("td").get_text().strip(), "%B %d, %Y")
-            return date.strftime("%y%m%d")
-    return None
+        # The embedded article links to its page, not to the full resolution asset: keep only its date
+        soup = BeautifulSoup(response.json().get("html", ""), "html.parser")
+        for row in soup.select(".media-detail-hero__meta-row"):
+            header = row.find("th")
+            if (header and header.get_text().strip() == "Date"):
+                date = datetime.datetime.strptime(row.find("td").get_text().strip(), "%B %d, %Y")
+                return date.strftime("%y%m%d")
+        return None
+    except Exception as e:
+        print(f"Error drawing random APOD: {str(e)}")
+        return None
 
 
 def get_image_url(soup: BeautifulSoup) -> str:
@@ -94,8 +98,14 @@ def scrappe_nasa(codeDate: str, minW: int = 0, minH: int = 0) -> str:
             image_response = requests.get(image_url, timeout=REQUEST_TIMEOUT)
 
             if image_response.status_code == 200:
-                if (minW and minH):
+                # Never cache something that is not an image (e.g. an HTML page after a site change)
+                try:
                     image = Image.open(BytesIO(image_response.content))
+                    image.verify()
+                except Exception:
+                    return None
+
+                if (minW and minH):
                     width, height = image.size
 
                     # Verify if the image has the minimum width and height
