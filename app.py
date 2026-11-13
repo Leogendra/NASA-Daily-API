@@ -1,11 +1,12 @@
 from nasa_scraper import create_folder, scrappe_nasa, resize_image, get_apod_metadata, get_random_apod_date
 from flask import Flask, jsonify, send_file, request
-import datetime, logging, requests, os, sys
+import datetime, logging, requests, os, sys, uuid
+from PIL import Image
 
 app = Flask(__name__)
 PORT = 3400
 BASE_IMAGE_DIR = "public"
-DEFAULT_IMAGE = "default.jpg"
+DEFAULT_IMAGE = "default.webp"
 BASE_URL = f"http://localhost:{PORT}"
 
 if not(os.path.isfile(DEFAULT_IMAGE)):
@@ -51,11 +52,39 @@ def get_current_utc_date() -> str:
 def resize_if_needed(image_path: str, name: str, w: int, h: int, crop: bool):
     if ((w > 0) and (h > 0)):
         output_folder = f"{BASE_IMAGE_DIR}/{w}x{h}"
-        resized_path = f"{output_folder}/{name}.jpg"
-        create_folder(output_folder)
-        resize_image(image_path, resized_path, w, h, crop=crop)
-        return resized_path, f"{name}_{w}x{h}.jpg"
-    return image_path, f"{name}.jpg"
+        resized_path = f"{output_folder}/{name}_{'crop' if crop else 'nocrop'}.jpg"
+        # Reuse the resized file unless the source changed since it was made
+        if not(os.path.isfile(resized_path)) or (os.path.getmtime(resized_path) < os.path.getmtime(image_path)):
+            create_folder(output_folder)
+            # Write aside then swap, so a concurrent request never serves a half-written file
+            tmp_path = f"{output_folder}/{uuid.uuid4().hex}.tmp.jpg"
+            try:
+                resize_image(image_path, tmp_path, w, h, crop=crop)
+                os.replace(tmp_path, resized_path)
+            finally:
+                if os.path.isfile(tmp_path):
+                    os.remove(tmp_path)
+        return resized_path, f"{name}_{w}x{h}"
+    return image_path, name
+
+
+def get_image_type(image_path: str):
+    # Cached files keep their original format whatever their extension, so read it from the content
+    with Image.open(image_path) as img:
+        # MPO is a JPEG carrying extra frames, clients only know it as JPEG
+        image_format = "JPEG" if (img.format == "MPO") else img.format
+    extension = "jpg" if (image_format == "JPEG") else image_format.lower()
+    return Image.MIME[image_format], extension
+
+
+def send_image(image_path: str, name: str, download: bool = False):
+    mimetype, extension = get_image_type(image_path)
+    return send_file(
+        image_path,
+        mimetype=mimetype,
+        as_attachment=download,
+        download_name=f"{name}.{extension}"
+    )
 
 
 def get_default_image(w: int, h: int, crop: bool):
@@ -63,7 +92,7 @@ def get_default_image(w: int, h: int, crop: bool):
         return resize_if_needed(DEFAULT_IMAGE, "default", w, h, crop)
     except Exception as e:
         print(f"Error resizing default image: {str(e)}")
-        return DEFAULT_IMAGE, DEFAULT_IMAGE
+        return DEFAULT_IMAGE, "default"
 
 
 def process_image(date: str, w: int, h: int, crop: bool, minW: int = 0, minH: int = 0):
@@ -78,7 +107,7 @@ def process_image(date: str, w: int, h: int, crop: bool, minW: int = 0, minH: in
 
 def send_default_image():
     # Last resort when a route fails: serve the default picture as is
-    return send_file(DEFAULT_IMAGE, mimetype="image/jpeg")
+    return send_image(DEFAULT_IMAGE, "default")
 
 
 @app.route("/", methods=["GET"])
@@ -105,12 +134,7 @@ def get_daily_nasa():
         if ("default" in image_name):
             return get_random_image()
 
-        return send_file(
-            image_path,
-            mimetype="image/jpeg",
-            as_attachment=download,
-            download_name=image_name
-        )
+        return send_image(image_path, image_name, download)
 
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -128,12 +152,7 @@ def get_image_by_date(date: str):
             return jsonify({"error": "Invalid date format. Use YYMMDD."}), 400
         image_path, image_name = process_image(date, w, h, crop)
 
-        return send_file(
-            image_path,
-            mimetype="image/jpeg",
-            as_attachment=download,
-            download_name=image_name
-        )
+        return send_image(image_path, image_name, download)
 
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -167,12 +186,7 @@ def get_random_image():
         if not(image_path):
             image_path, image_name = get_default_image(w, h, crop)
 
-        return send_file(
-            image_path,
-            mimetype="image/jpeg",
-            as_attachment=download,
-            download_name=image_name
-        )
+        return send_image(image_path, image_name, download)
 
     except Exception as e:
         print(f"Error: {str(e)}")
