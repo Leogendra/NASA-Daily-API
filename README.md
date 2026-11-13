@@ -83,7 +83,7 @@ These query parameters are available in all endpoints:
    pip install -r requirements.txt
    ```
 
-3. Add a `default.jpg` image at the root of the project. This image will be used when the API does not have an image to return.
+3. Add a `default.webp` image at the root of the project. This image will be used when the API does not have an image to return.
 
 4. Run the API:
    ```bash
