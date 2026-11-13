@@ -1,6 +1,6 @@
 from nasa_scraper import create_folder, scrappe_nasa, resize_image, get_apod_metadata, get_random_apod_date
-from flask import Flask, jsonify, send_file, request
-import datetime, logging, requests, os, sys, uuid
+from flask import Flask, abort, jsonify, send_file, request
+import datetime, functools, logging, requests, os, re, sys, uuid
 from PIL import Image
 
 app = Flask(__name__)
@@ -8,6 +8,11 @@ PORT = 3400
 BASE_IMAGE_DIR = "public"
 DEFAULT_IMAGE = "default.webp"
 BASE_URL = f"http://localhost:{PORT}"
+SUSPICIOUS_PATH = re.compile(
+    r"\.(php|env|git|json|ya?ml|sql|bak|key|pem|tfstate|ini|conf|cfg|log)\b"
+    r"|wp-|wordpress|phpinfo|_environment|actuator|cgi-bin",
+    re.IGNORECASE
+)
 
 if not(os.path.isfile(DEFAULT_IMAGE)):
     sys.exit(f"Error: default image '{DEFAULT_IMAGE}' not found in {os.getcwd()}")
@@ -24,25 +29,40 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-@app.before_request
-def log_request():
-    userLocation = "Unknown"
-    userIp = request.remote_addr
+@functools.lru_cache(maxsize=1024)
+def lookup_location(ip: str) -> str:
+    # Raises on failure so a timeout is not cached and the next request retries
+    resp = requests.get(f"https://ipinfo.io/{ip}/json", timeout=2)
+    resp.raise_for_status()
+    data = resp.json()
+    city = data.get("city", "")
+    region = data.get("region", "")
+    country = data.get("country", "")
+    return f"{city}, {region}, {country}".strip(", ") or "Unknown"
+
+
+def get_location(ip: str) -> str:
     try:
-        resp = requests.get(f"https://ipinfo.io/{userIp}/json", timeout=2)
-        if resp.status_code == 200:
-            data = resp.json()
-            city = data.get("city", "")
-            region = data.get("region", "")
-            country = data.get("country", "")
-            userLocation = f"{city}, {region}, {country}".strip(", ")
-            if not(userLocation):
-                userLocation = "Unknown"
+        return lookup_location(ip)
     except Exception:
-        pass
-    
-    log_message = f"{request.path} - {userIp} - {userLocation}"
-    logger.info(log_message)
+        return "Unknown"
+
+
+@app.before_request
+def reject_scanners():
+    if (SUSPICIOUS_PATH.search(request.path)):
+        abort(404)
+
+
+@app.after_request
+def log_request(response):
+    userIp = request.remote_addr
+    isScanner = SUSPICIOUS_PATH.search(request.path)
+    # Only real routes are worth a network call, unknown paths and probes stay unlocated
+    userLocation = get_location(userIp) if (request.url_rule and not(isScanner)) else "Unknown"
+    prefix = "SCANNER " if isScanner else ""
+    logger.info(f"{prefix}{request.path} - {userIp} - {userLocation} - {response.status_code}")
+    return response
 
 
 def get_current_utc_date() -> str:
